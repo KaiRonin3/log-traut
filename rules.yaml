@@ -1,0 +1,118 @@
+global:
+  database_path: "/home/kai/Projects/traut/events.db"
+  alert_cooldown: 600 # seconds between alerts
+
+  channels:
+    email:
+      smpt_host: "localhost"
+      smtp_port: 587
+      from: "alert@server.local"
+      to: "temptestdefault@gmail.com"
+
+rules:
+  - id: ssh_brute_force
+    name: "SSH Brute Force Attack"
+    enabled: true
+    source : ssh
+    severity: high
+
+    match:
+      type: regex
+      pattern: 'Failed password.*from\s+(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+port\s+(?P<port>\d+)'
+      extract_fields: ["ip", "port"]
+
+    threshold:
+      count: 3
+      window: 300
+
+    alert:
+      channels: ["email"]
+      message_template: "SSH brute force: {ip} failed {count} times in {window}s"
+      deduplicate_by: "ip"
+
+  - id: kernel_oom
+    name: "Out of Memory Kill"
+    enabled: true
+    source: kernel
+    severity: critical
+
+    match:
+      type: regex
+      pattern: 'Out of memory: Kill process (?P<pid>\d+) \((?P<process>.+?)\)'
+      extract_fields: ["pid", "process"]
+
+    threshold:
+      count: 1
+      window: 0
+    alert:
+      channels: ["email"]
+      message_template: "CRITICAL: OOM killed {process} (PID {pid})"
+
+  - id: nginx_server_errors
+    name: "nginx 5xx Spike"
+    enabled: true
+    source: nginx
+    severity: madium
+
+    match:
+      type: regex
+      pattern: '"(?P<method>\w+) (?P<path>.+?) HTTP/\d\.\d" 5\d{2}'
+      extract_fields: ["method", "path"]
+
+    threshold:
+      count: 10
+      window: 60
+
+    alert: 
+      channels: ["email"]
+      message_template: "nginx 5xx spike: {count} errors in {window}s"
+      deduplicate_by: null
+
+  - id: sudo_attempt
+    name: "Sudo Privilege Escalation"
+    enabled: true
+    source: auditd
+    severity: medium
+
+    match:
+      type: regex
+      pattern: 'type=USER_CMD.*exe="/usr/bin/sudo"'
+      extract_fields: ["user", "cmd"]
+
+    threshold:
+      count: 1
+      window: 0
+
+    alert:
+      channels: ["email"]
+      message_template: "Sudo attempt by {user}: {cmd}"
+
+  - id: ssh_success
+    name: "SSH Successful Login"
+    enabled: true
+    source: ssh
+    severity: info
+    match:
+      type: regex
+      pattern: 'Accepted\s+(?:password|publickey)\s+for'
+    threshold:
+      count: 1
+      window: 0
+    alert:
+      channels: []
+      message_template: "Login: {user} from {ip}"
+
+  - id: sudo_attempt
+    name: "Sudo Privilege Escalation"
+    enabled: true
+    source: auditd
+    severity: medium
+    match:
+      type: regex
+      pattern: 'type=USER_CMD.*exe="/usr/bin/sudo"'
+    threshold:
+      count: 1
+      window: 0
+    alert:
+      channels: []
+      message_template: "Sudo by {user}: {cmd}"
