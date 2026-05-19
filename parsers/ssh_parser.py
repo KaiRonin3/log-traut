@@ -3,27 +3,28 @@ from typing import Optional, Dict, Any
 from .base import BaseParser
 import time
 
+# Matches both IPv4 (1.2.3.4) and IPv6 (::1, 2001:db8::1, etc.)
+_IP_PATTERN = r'(?P<ip>(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]{2,39})'
+
 class SSHParser(BaseParser):
     def __init__(self):
         super().__init__("ssh")
         self.pid_pattern = re.compile(r'\[(\d+)\]')
-        self.ip_pattern = re.compile(r'Failed password.*from\s+(?P<ip>\d+\.\d+\.\d+\.\d+)\s+port\s+(?P<port>\d+)')
+        self.ip_pattern = re.compile(r'Failed password.*from\s+' + _IP_PATTERN + r'\s+port\s+(?P<port>\d+)')
         self.user_pattern = re.compile(r"user\s*=\s*'(?P<user>[^']+)'")
-        self.success_pattern = re.compile(r'Accepted\s+(?:password|publickey)\s+for\s+(?P<user>\S+)\s+from\s+(?P<ip>\d+\.\d+\.\d+\.\d+)')
+        self.success_pattern = re.compile(r'Accepted\s+(?:password|publickey)\s+for\s+(?P<user>\S+)\s+from\s+' + _IP_PATTERN)
         self.dt_pattern = re.compile(r"\A([a-zA-Z]{3})\s*(\d{1,2})\s*(\d{2}:\d{2}:\d{2})")
         self._pending = {}
-    
+
     def parse(self, line: str) -> Optional[Dict[str, Any]]:
-        # Try failed password first
         if "Failed password" in line:
             return self._handle_failure(line)
-        
-        # Try successful login
+
         success_match = self.success_pattern.search(line)
         if success_match:
             return self._create_event(line, "ssh_success", success_match.groupdict())
-        
-        # Try user correlation for PAM lines
+
+        # Cache user from PAM lines for later correlation with failure lines
         user_match = self.user_pattern.search(line)
         if user_match:
             pid_match = self.pid_pattern.search(line)
@@ -32,25 +33,24 @@ class SSHParser(BaseParser):
                     'user': user_match.group('user'),
                     'time': time.time()
                 }
-        
+
         return None
-    
-    def _handle_failure(self, line: str) -> Dict[str, Any]:
-        # Your existing failure handling logic
+
+    def _handle_failure(self, line: str) -> Optional[Dict[str, Any]]:
         pid_match = self.pid_pattern.search(line)
         ip_match = self.ip_pattern.search(line)
-        
+
         if not ip_match:
             return None
-            
+
         data = ip_match.groupdict()
         pid = pid_match.group(1) if pid_match else "unknown"
-        pending_data = self._pending.get(pid, {})
-        
+        pending_data = self._pending.pop(pid, {})
+
         dt_match = self.dt_pattern.search(line)
         timestamp = self._format_timestamp(dt_match) if dt_match else self.extract_timestamp(line)
-        
-        event = {
+
+        return {
             "timestamp": timestamp,
             "source": self.source_name,
             "raw": line.strip(),
@@ -64,17 +64,11 @@ class SSHParser(BaseParser):
             "severity": None,
             "rule_id": None
         }
-        
-        if pid in self._pending:
-            del self._pending[pid]
-        
-        return event
-    
+
     def _create_event(self, line: str, event_type: str, data: dict) -> Dict[str, Any]:
-        """Generic event creator."""
         dt_match = self.dt_pattern.search(line)
         timestamp = self._format_timestamp(dt_match) if dt_match else self.extract_timestamp(line)
-        
+
         return {
             "timestamp": timestamp,
             "source": self.source_name,
@@ -84,9 +78,8 @@ class SSHParser(BaseParser):
             "severity": None,
             "rule_id": None
         }
-    
+
     def _format_timestamp(self, dt_match) -> str:
-        # Your existing timestamp formatting
         from datetime import datetime
         month_str, day, time_str = dt_match.groups()
         months = {

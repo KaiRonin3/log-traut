@@ -6,8 +6,7 @@ from .base import BaseParser
 class AuditdParser(BaseParser):
     def __init__(self):
         super().__init__("auditd")
-        
-        # Patterns for field extraction (not full line matching)
+        self.audit_ts_pattern = re.compile(r'msg=audit\((\d+)\.\d+:\d+\)')
         self.useradd_pattern = re.compile(r'type=ADD_USER.*acct="(?P<username>\w+)"')
         self.ssh_key_pattern = re.compile(r'type=PATH.*name="authorized_keys"')
     
@@ -36,8 +35,13 @@ class AuditdParser(BaseParser):
     
     def _create_event(self, line: str, event_type: str, data: dict) -> Dict[str, Any]:
         from datetime import datetime
+        ts_match = self.audit_ts_pattern.search(line)
+        if ts_match:
+            timestamp = datetime.utcfromtimestamp(int(ts_match.group(1))).isoformat()
+        else:
+            timestamp = datetime.now().isoformat()
         return {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": timestamp,
             "source": self.source_name,
             "raw": line.strip(),
             "parsed": data,

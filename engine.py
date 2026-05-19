@@ -61,7 +61,17 @@ class RuleEngine:
     def _check_threshold(self, event: Dict, rule: Rule) -> bool:
         now = time.time()
         key = self._get_key(event, rule)
-        
+
+        # window=0 with count=1 means "alert every occurrence" — skip accumulation
+        # to avoid the event list growing without bound over a long run.
+        if rule.threshold_window == 0 and rule.threshold_count == 1:
+            cooldown = 600
+            if key not in self.last_alert or (now - self.last_alert[key]) > cooldown:
+                self.last_alert[key] = now
+                self.event_counts[key] = [now]
+                return True
+            return False
+
         window_start = now - rule.threshold_window
         self.event_counts[key] = [t for t in self.event_counts[key] if t > window_start]
         self.event_counts[key].append(now)
@@ -99,9 +109,9 @@ class RuleEngine:
                 if chain_alert:
                     return{
                         "type": "correlated_threat",
-                        "rule alert": rule_alert,
+                        "rule_alert": rule_alert,
                         "chain_alert": chain_alert,
-                        "active threats": self.correlator.get_active_threats()
+                        "active_threats": self.correlator.get_active_threats()
                     }
 
                 return rule_alert

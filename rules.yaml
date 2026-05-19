@@ -4,7 +4,7 @@ global:
 
   channels:
     email:
-      smpt_host: "localhost"
+      smtp_host: "localhost"
       smtp_port: 587
       from: "alert@server.local"
       to: "temptestdefault@gmail.com"
@@ -18,7 +18,7 @@ rules:
 
     match:
       type: regex
-      pattern: 'Failed password.*from\s+(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+port\s+(?P<port>\d+)'
+      pattern: 'Failed password.*from\s+(?P<ip>(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]{2,39})\s+port\s+(?P<port>\d+)'
       extract_fields: ["ip", "port"]
 
     threshold:
@@ -52,7 +52,7 @@ rules:
     name: "nginx 5xx Spike"
     enabled: true
     source: nginx
-    severity: madium
+    severity: medium
 
     match:
       type: regex
@@ -101,18 +101,3 @@ rules:
     alert:
       channels: []
       message_template: "Login: {user} from {ip}"
-
-  - id: sudo_attempt
-    name: "Sudo Privilege Escalation"
-    enabled: true
-    source: auditd
-    severity: medium
-    match:
-      type: regex
-      pattern: 'type=USER_CMD.*exe="/usr/bin/sudo"'
-    threshold:
-      count: 1
-      window: 0
-    alert:
-      channels: []
-      message_template: "Sudo by {user}: {cmd}"

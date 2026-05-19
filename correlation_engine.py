@@ -79,8 +79,20 @@ class CorrelationEngine:
         self.max_age = max_age  
     
     def process_event(self, event: Dict, stage: str) -> Optional[Dict]:
-        attacker = (event["parsed"].get("ip") or 
-                event["parsed"].get("attacker_ip"))
+        attacker = (event["parsed"].get("ip") or
+                    event["parsed"].get("attacker_ip"))
+
+        # For events without an IP (e.g. auditd sudo), try to resolve the
+        # attacker IP by matching the acting user against a known chain.
+        if not attacker:
+            user = event["parsed"].get("user")
+            if user:
+                for ip, chain in self.chains.items():
+                    if user in chain.target_users:
+                        attacker = ip
+                        # Inject so downstream code (alert messages etc.) can use it
+                        event["parsed"]["attacker_ip"] = ip
+                        break
         if not attacker:
             return None
         

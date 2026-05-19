@@ -15,7 +15,7 @@ events = [
     ("ssh", "Apr 03 11:41:00 server sshd[1010]: Accepted password for ubuntu from 10.0.0.50 port 12348 ssh2"),
     
     # Stage 3: Privilege Escalation (sudo attempt)
-    ("auditd", 'type=USER_CMD msg=audit(1743680460.123:10001): user=ubuntu terminal=pts/0 cwd="/home/ubuntu" exe="/usr/bin/sudo" cmd="sudo su -"'),
+    ("auditd", 'type=USER_CMD msg=audit(1775216460.123:10001): user=ubuntu terminal=pts/0 cwd="/home/ubuntu" exe="/usr/bin/sudo" cmd="sudo su -"'),
 ]
 
 print("=== Simulating Attack Chain ===\n")
@@ -33,6 +33,7 @@ for i, (source, line) in enumerate(events, 1):
                 print(f"   Active threats: {result['active_threats']}")
             else:
                 print(f"   Alert: {result['message']}")
+
     print("\n=== Final Correlator State ===")
     for threat in engine.correlator.get_active_threats():
         print(f"IP: {threat['ip']}")
