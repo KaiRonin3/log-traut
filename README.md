@@ -53,7 +53,7 @@ parsers/
   kernel_parser.py   kernel log parser
 ```
 
-Parsers are decoupled from the engine via a common interface — adding a new log source means implementing one class with a `parse(line)` method.
+Parsers are decoupled from the engine via a common interface - adding a new log source means implementing one class with a `parse(line)` method.
 
 The correlation engine tracks attack stages per attacker IP using a chain model. For auditd events that carry no IP, the engine reverse-resolves the attacker by matching the acting username against known chains from earlier SSH stages.
 
@@ -81,14 +81,14 @@ Event 4: Apr 03 11:41:00 server sshd[1010]: Accepted password for ubuntu...
    Alert: Login: ubuntu from 10.0.0.50
 
 Event 5: type=USER_CMD msg=audit(1775216460.123:10001): user=ubuntu...
-🚨 CORRELATED THREAT DETECTED:
+ CORRELATED THREAT DETECTED:
    Rapid attack progression from 10.0.0.50: brute force → successful login → privilege escalation in 50s
    Active threats: [{'ip': '10.0.0.50', 'stages': ['recon', 'initial_access', 'privilege_escalation'], 'duration': 50, 'user_targets': ['ubuntu']}]
 ```
 
 ## Notable implementation details
 
-- **IPv6 support** — SSH parser handles both IPv4 and IPv6 addresses (`::1` loopback included), required for modern OpenSSH on Kali/Debian which uses `sshd-session` per-connection processes
-- **Timezone-aware timestamps** — auditd epoch timestamps use `utcfromtimestamp` to match sshd's naive UTC output; using local time caused a 5h30m skew on IST systems that silently broke chain correlation
-- **IP resolution for auditd events** — auditd lines carry no IP; the correlation engine reverse-looks up the attacker IP by matching the sudo user against target users already recorded in an active chain
-- **Sliding window deduplication** — alerts include a cooldown to prevent repeated firing on the same event stream
+- **IPv6 support** - SSH parser handles both IPv4 and IPv6 addresses (`::1` loopback included), required for modern OpenSSH on Kali/Debian which uses `sshd-session` per-connection processes
+- **Timezone-aware timestamps** - auditd epoch timestamps use `utcfromtimestamp` to match sshd's naive UTC output; using local time caused a 5h30m skew on IST systems that silently broke chain correlation
+- **IP resolution for auditd events** - auditd lines carry no IP; the correlation engine reverse-looks up the attacker IP by matching the sudo user against target users already recorded in an active chain
+- **Sliding window deduplication** - alerts include a cooldown to prevent repeated firing on the same event stream
